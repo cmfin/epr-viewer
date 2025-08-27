@@ -6,9 +6,8 @@
   <title>HCPA Sheet Viewer</title>
   <style>
     :root{
-      /* Softer versions of your logo colors */
-      --navy: #2b4c70;     /* soft blue */
-      --green: #2aa36b;    /* soft green */
+      --navy: #2b4c70;     /* soft HCPA blue */
+      --green: #2aa36b;    /* soft HCPA green */
       --text: #102A43;     /* deep slate */
       --muted: #64748b;    /* slate-500 */
       --bg: #f5f8fb;       /* light blue-grey */
@@ -18,47 +17,53 @@
     }
     *{ box-sizing: border-box; }
     body{
-      margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      color:var(--text); background:var(--bg);
+      margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      color:var(--text); background:var(--bg); line-height:1.45;
     }
     .wrap{ max-width:1100px; margin:24px auto 48px; padding:0 16px; }
-    .brand{ display:flex; align-items:center; gap:16px; margin-bottom:10px; }
+    .brand{ display:flex; align-items:center; gap:16px; margin-bottom:12px; }
     .brand img{ height:64px; width:auto; border-radius:10px; display:block; }
-    .headline{ font-size:20px; font-weight:700; color:var(--navy); line-height:1.2; }
+    .headline{ font-size:22px; font-weight:800; color:var(--navy); line-height:1.2; }
     .sub{ color:var(--muted); margin-top:4px; }
+
     .card{
-      background:var(--card); border:1px solid var(--border); border-radius:14px;
+      background:var(--card); border:1px solid var(--border); border-radius:16px;
       box-shadow:0 8px 24px rgba(16,24,40,.06); padding:16px;
     }
     .meta{
       display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between;
-      padding:8px 4px 12px;
+      padding:6px 2px 12px;
     }
     .badge{
-      display:inline-block; padding:6px 10px; border-radius:999px;
-      background:rgba(42,163,107,.12); color:var(--green); font-weight:600; font-size:12px;
+      display:inline-block; padding:6px 10px; border-radius:999px; font-size:12px; font-weight:700;
+      background:linear-gradient(90deg, rgba(43,76,112,.12), rgba(42,163,107,.12));
+      color:var(--navy);
     }
     button.refresh{
       border:1px solid var(--border); background:#fff; padding:8px 12px;
-      border-radius:10px; cursor:pointer; font-weight:600;
+      border-radius:10px; cursor:pointer; font-weight:700;
     }
     button.refresh:hover{ background:#f1f5f9; }
 
-    table{ width:100%; border-collapse:collapse; margin-top:8px; border:1px solid var(--border); }
+    .tableScroll{ overflow-x:auto; }
+    table{ width:100%; border-collapse:collapse; margin-top:8px; table-layout:auto; }
     thead th{
-      background:linear-gradient(0deg, rgba(43,76,112,0.06), rgba(43,76,112,0.06));
-      color:#0b2542; font-weight:700; text-align:left; padding:12px; border-bottom:1px solid var(--border);
-      font-size:14px;
+      background:linear-gradient(0deg, rgba(43,76,112,0.10), rgba(43,76,112,0.10));
+      color:#0b2542; font-weight:800; text-align:left; padding:12px 14px; border-bottom:2px solid var(--border);
+      font-size:14px; position:sticky; top:0;
     }
-    tbody td{ padding:12px; border-bottom:1px solid var(--border); font-size:14px; }
+    tbody td{ padding:12px 14px; border-bottom:1px solid var(--border); font-size:14px; vertical-align: top; }
     tbody tr:nth-child(even){ background:var(--rowAlt); }
+    thead th, tbody td{ white-space:normal; word-wrap:break-word; }
     .footerNote{ color:var(--muted); font-size:12px; margin-top:10px; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="brand">
-      <img id="logo" alt="HCPA logo">
+      <!-- Use the logo you uploaded to the repo -->
+      <img src="logo.png" alt="HCPA logo"
+           onerror="this.onerror=null;this.src='https://drive.google.com/uc?export=view&id=13orYcC_txArGIeSmYt6508rdyZ67YEgx';">
       <div>
         <div class="headline">Household & Commercial Products Association</div>
         <div class="sub">Innovative Products for Home. Work. Life.</div>
@@ -72,41 +77,20 @@
         <div><button class="refresh" onclick="loadData()">↻ Refresh</button></div>
       </div>
 
-      <div id="tableWrap">Loading data…</div>
+      <div class="tableScroll"><div id="tableWrap">Loading data…</div></div>
       <div class="footerNote" id="fetchedAt">Page fetched: —</div>
     </div>
   </div>
 
   <script>
-    // === CONFIG: put your IDs here ===
+    // === CONFIG ===
     const SHEET_ID = '1Zkp6pU4w10QEe1SorNFp3iJqt4n15h7FCNH_oBOBoaI';
-    const GID = '0'; // first tab
-    const LOGO_URL = 'https://drive.google.com/uc?export=view&id=13orYcC_txArGIeSmYt6508rdyZ67YEgx';
-
-    document.getElementById('logo').src = LOGO_URL;
+    const GID = '0'; // tab gid
 
     function escapeHtml(s){
       return String(s ?? '')
         .replace(/&/g,'&amp;').replace(/</g,'&lt;')
         .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
-    }
-
-    function buildTableFromGviz(table){
-      const headers = table.cols.map((c, i) => c.label || c.id || ('Col' + (i+1)));
-      const rows = table.rows || [];
-
-      let html = '<table><thead><tr>';
-      headers.forEach(h => html += `<th>${escapeHtml(h)}</th>`);
-      html += '</tr></thead><tbody>';
-
-      rows.forEach(r => {
-        const cells = (r.c || []).map(c => c ? (c.f || c.v) : '');
-        html += '<tr>';
-        headers.forEach((_, i) => html += `<td>${escapeHtml(cells[i] ?? '')}</td>`);
-        html += '</tr>';
-      });
-      html += '</tbody></table>';
-      return html;
     }
 
     function parseGviz(text){
@@ -116,6 +100,25 @@
       return JSON.parse(m[1]);
     }
 
+    function buildTableFromRows(matrix){
+      if(!matrix.length){ return '<p>No data found.</p>'; }
+      const header = matrix[0];
+      const rows = matrix.slice(1);
+
+      let html = '<table><thead><tr>';
+      header.forEach(h => html += `<th>${escapeHtml(h)}</th>`);
+      html += '</tr></thead><tbody>';
+      rows.forEach(r => {
+        html += '<tr>';
+        for(let i=0;i<header.length;i++){
+          html += `<td>${escapeHtml(r[i] ?? '')}</td>`;
+        }
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+      return html;
+    }
+
     async function loadData(){
       const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${GID}`;
       const tableWrap = document.getElementById('tableWrap');
@@ -123,31 +126,38 @@
 
       try{
         const res = await fetch(url, { cache: 'no-store' });
-        const lastMod = res.headers.get('last-modified'); // may be null if header not exposed
+        const lastMod = res.headers.get('last-modified'); // may be null
         const text = await res.text();
         const json = parseGviz(text);
-
         if(json.status !== 'ok') throw new Error('GViz status not ok');
 
-        document.getElementById('sheetName').textContent = json.table?.rows?.length
-          ? (json.table?.cols?.length ? (json.table?.cols[0]?.label ? 'Sheet' : 'Data') : 'Sheet')
-          : 'Sheet';
+        // Convert GViz table -> simple 2D array of display values
+        const colsLen = json.table.cols.length;
+        const matrix = json.table.rows.map(row => {
+          const arr = new Array(colsLen).fill('');
+          (row.c || []).forEach((cell, idx) => { arr[idx] = cell ? (cell.f ?? cell.v ?? '') : ''; });
+          return arr;
+        });
 
-        if (lastMod) {
-          document.getElementById('lastUpdated').textContent = 'Sheet last updated: ' + new Date(lastMod).toLocaleString();
-        } else {
-          document.getElementById('lastUpdated').textContent = 'Sheet last updated: (time not provided by server)';
+        // Use FIRST ROW as header (this removes the A/B/C labels issue)
+        if (matrix.length === 0) {
+          tableWrap.innerHTML = '<p>No data found.</p>';
+          return;
         }
 
-        tableWrap.innerHTML = buildTableFromGviz(json.table);
+        document.getElementById('sheetName').textContent = 'Data';
         document.getElementById('fetchedAt').textContent = 'Page fetched: ' + new Date().toLocaleString();
+        document.getElementById('lastUpdated').textContent = lastMod
+          ? ('Sheet last updated: ' + new Date(lastMod).toLocaleString())
+          : 'Sheet last updated: (time not provided by server)';
+
+        tableWrap.innerHTML = buildTableFromRows(matrix);
       }catch(err){
         console.error(err);
-        tableWrap.innerHTML = '<p>Could not load data. Make sure the sheet is <em>Published to the web</em>.</p>';
+        tableWrap.innerHTML = '<p>Could not load data. Ensure the sheet is <em>File → Share → Publish to the web</em>.</p>';
       }
     }
 
-    // Initial load
     loadData();
   </script>
 </body>
