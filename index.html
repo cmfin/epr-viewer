@@ -187,4 +187,11 @@
         tableWrap.innerHTML = buildTableFromRows(matrix);
       }catch(err){
         console.error(err);
-        tableWrap.innerHTML = '<p>Could not load data. Ensure the sheet is <em>File →
+        tableWrap.innerHTML = '<p>Could not load data. Ensure the sheet is <em>File → Share → Publish to the web</em>.</p>';
+      }
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
