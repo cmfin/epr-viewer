@@ -28,7 +28,7 @@
       font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
       color:var(--text);
       background:var(--bg);
-      line-height:1.75;
+      line-height:1.6;
       letter-spacing:0.15px;
     }
 
@@ -59,9 +59,7 @@
       color:var(--navy);
     }
 
-    .viewBar{
-      display:flex; gap:8px; align-items:center;
-    }
+    .viewBar{ display:flex; gap:8px; align-items:center; }
     .pill{
       border:1px solid var(--border); background:#fff; padding:8px 12px; border-radius:999px; cursor:pointer; font-weight:700;
     }
@@ -73,7 +71,7 @@
     }
     button.refresh:hover{ background:#f1f5f9; }
 
-    /* TABLE styles (kept for toggle) */
+    /* ===== TABLE view (kept for toggle) ===== */
     .tableScroll{ overflow-x:auto; -webkit-overflow-scrolling: touch; }
     table{ width:100%; border-collapse:collapse; margin-top:8px; table-layout:auto; }
     thead th{
@@ -84,33 +82,56 @@
     thead th, tbody td{
       font-size: var(--font-size);
       padding: var(--cell-pad-y) var(--cell-pad-x);
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
-      hyphens: auto;
       vertical-align: top;
     }
     tbody tr:nth-child(even){ background:var(--rowAlt); }
     tbody tr:hover{ background: rgba(43,76,112,0.05); }
     tbody td + td{ padding-left: calc(var(--cell-pad-x) + 12px); }
 
-    /* CARD-ROW layout (default) */
-    #cardsWrap{ display: grid; gap: 14px; }
+    /* Make each table cell horizontally scroll its content instead of wrapping */
+    .scrollX{
+      display:block;
+      max-width:100%;
+      overflow-x:auto; overflow-y:hidden;
+      white-space:nowrap;             /* no wrapping */
+      -webkit-overflow-scrolling:touch;
+    }
+
+    /* ===== CARDS view (horizontal scroller) ===== */
+    #cardsWrap{ display:grid; gap:14px; }
     .rowCard{
       border:1px solid var(--border); border-left:6px solid rgba(42,163,107,.35);
-      background:#fff; border-radius:14px; padding:16px;
+      background:#fff; border-radius:14px; padding:14px 10px;
       box-shadow: 0 6px 18px rgba(16,24,40,.06);
     }
-    .rowGrid{
-      display:grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 10px 16px;
+
+    /* Single-line, sideways scroll strip of fields */
+    .rowStrip{
+      display:inline-flex; gap:16px; align-items:flex-start;
+      max-width:100%;
+      overflow-x:auto; overflow-y:hidden;
+      white-space:nowrap;
+      -webkit-overflow-scrolling:touch;
+      padding:4px 8px 6px;
+    }
+
+    /* Each field shows as a compact chip; increase min-width if you want wider */
+    .kv{
+      display:inline-block;
+      min-width:280px;
+      padding:8px 12px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:#fff;
     }
     .kv .k{
       font-size:12px; letter-spacing:.4px; text-transform:uppercase; color:var(--muted); margin-bottom:6px;
+      display:block;
     }
     .kv .v{
       font-size: var(--font-size);
-      white-space: pre-wrap; overflow-wrap: anywhere; hyphens: auto;
+      line-height:1.7;
+      white-space:nowrap;              /* do not wrap values here */
     }
 
     .footerNote{ color:var(--muted); font-size:12px; margin-top:10px; }
@@ -170,7 +191,7 @@
       rows.forEach(r => {
         html += '<tr>';
         for(let i=0;i<header.length;i++){
-          html += `<td>${escapeHtml(r[i] ?? '')}</td>`;
+          html += `<td><span class="scrollX">${escapeHtml(r[i] ?? '')}</span></td>`;
         }
         html += '</tr>';
       });
@@ -186,11 +207,15 @@
 
       let out = '';
       rows.forEach(r => {
-        out += '<div class="rowCard"><div class="rowGrid">';
+        out += '<div class="rowCard"><div class="rowStrip">';
         headers.forEach((h, i) => {
           const val = r[i];
           if (val === '' || val == null) return; // skip empty cells for readability
-          out += `<div class="kv"><div class="k">${escapeHtml(h)}</div><div class="v">${escapeHtml(val)}</div></div>`;
+          out += `
+            <div class="kv">
+              <span class="k">${escapeHtml(h)}</span>
+              <span class="v">${escapeHtml(val)}</span>
+            </div>`;
         });
         out += '</div></div>';
       });
@@ -221,11 +246,10 @@
         return;
       }
 
-      // Insert header row (first row is header in your sheet)
-      const header = json.table.cols.map((c,i) => matrix[0]?.[i] || c.label || c.id || ('Col ' + (i+1)));
-      matrix.unshift(header); // ensure consistent headers
+      // First row in your sheet is the header
+      // (GViz doesn't always include labels; using the sheet row keeps it consistent)
+      const header = matrix[0];
 
-      // Render both views
       cardsWrap.innerHTML = buildCardsFromRows(matrix);
       tableWrap.innerHTML = buildTableFromRows(matrix);
 
