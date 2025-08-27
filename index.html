@@ -96,4 +96,200 @@
     /* CARD-ROW layout (default) */
     #cardsWrap{ display: grid; gap: 14px; }
     .rowCard{
-      border:1px solid var(--border); border-left:6px solid rgba(42,163,1
+      border:1px solid var(--border); border-left:6px solid rgba(42,163,107,.35);
+      background:#fff; border-radius:14px; padding:16px;
+      box-shadow: 0 6px 18px rgba(16,24,40,.06);
+    }
+    .rowGrid{
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 10px 16px;
+    }
+    .kv .k{
+      font-size:12px; letter-spacing:.4px; text-transform:uppercase; color:var(--muted); margin-bottom:6px;
+    }
+    .kv .v{
+      font-size: var(--font-size);
+      white-space: pre-wrap; overflow-wrap: anywhere; hyphens: auto;
+    }
+
+    .footerNote{ color:var(--muted); font-size:12px; margin-top:10px; }
+    .hide{ display:none !important; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">
+      <img src="logo.png" alt="HCPA logo"
+           onerror="this.onerror=null;this.src='https://drive.google.com/uc?export=view&id=13orYcC_txArGIeSmYt6508rdyZ67YEgx';">
+      <div>
+        <div class="headline">Household & Commercial Products Association</div>
+        <div class="sub">Innovative Products for Home. Work. Life.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="meta">
+        <div class="leftMeta">
+          <span id="sheetName" class="badge">Loading…</span>
+          <span class="sub" id="lastUpdated">Sheet last updated: —</span>
+        </div>
+        <div class="viewBar">
+          <button class="pill active" id="btnCards">Cards</button>
+          <button class="pill" id="btnTable">Table</button>
+          <button class="refresh" onclick="loadData()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <div id="cardsWrap">Loading data…</div>
+      <div class="tableScroll"><div id="tableWrap" class="hide"></div></div>
+      <div class="footerNote" id="fetchedAt">Page fetched: —</div>
+    </div>
+  </div>
+
+  <script>
+    // === CONFIG ===
+    const SHEET_ID = '1Zkp6pU4w10QEe1SorNFp3iJqt4n15h7FCNH_oBOBoaI';
+    const GID = '0'; // tab gid
+    const DEFAULT_VIEW = 'cards'; // 'cards' or 'table'
+
+    function escapeHtml(s){
+      return String(s ?? '')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+    }
+
+    function buildTableFromRows(matrix){
+      if(!matrix.length){ return '<p>No data found.</p>'; }
+      const header = matrix[0], rows = matrix.slice(1);
+
+      let html = '<table><thead><tr>';
+      header.forEach(h => html += `<th>${escapeHtml(h)}</th>`);
+      html += '</tr></thead><tbody>';
+
+      rows.forEach(r => {
+        html += '<tr>';
+        for(let i=0;i<header.length;i++){
+          html += `<td>${escapeHtml(r[i] ?? '')}</td>`;
+        }
+        html += '</tr>';
+      });
+
+      html += '</tbody></table>';
+      return html;
+    }
+
+    function buildCardsFromRows(matrix){
+      if(!matrix.length){ return '<p>No data found.</p>'; }
+      const headers = matrix[0];
+      const rows = matrix.slice(1);
+
+      let out = '';
+      rows.forEach(r => {
+        out += '<div class="rowCard"><div class="rowGrid">';
+        headers.forEach((h, i) => {
+          const val = r[i];
+          if (val === '' || val == null) return; // skip empty cells for readability
+          out += `<div class="kv"><div class="k">${escapeHtml(h)}</div><div class="v">${escapeHtml(val)}</div></div>`;
+        });
+        out += '</div></div>';
+      });
+      return out || '<p>No data rows.</p>';
+    }
+
+    // JSONP handler — Google calls this with the table JSON
+    function handleGviz(json){
+      const cardsWrap = document.getElementById('cardsWrap');
+      const tableWrap = document.getElementById('tableWrap');
+
+      if(json.status !== 'ok' || !json.table){
+        cardsWrap.innerHTML = '<p>Could not load data. Make sure the sheet is <em>File → Share → Publish to the web</em>.</p>';
+        tableWrap.innerHTML = '';
+        return;
+      }
+
+      const colsLen = json.table.cols.length;
+      const matrix = json.table.rows.map(row => {
+        const arr = new Array(colsLen).fill('');
+        (row.c || []).forEach((cell, idx) => { arr[idx] = cell ? (cell.f ?? cell.v ?? '') : ''; });
+        return arr;
+      });
+
+      if (matrix.length === 0) {
+        cardsWrap.innerHTML = '<p>No data found.</p>';
+        tableWrap.innerHTML = '';
+        return;
+      }
+
+      // Insert header row (first row is header in your sheet)
+      const header = json.table.cols.map((c,i) => matrix[0]?.[i] || c.label || c.id || ('Col ' + (i+1)));
+      matrix.unshift(header); // ensure consistent headers
+
+      // Render both views
+      cardsWrap.innerHTML = buildCardsFromRows(matrix);
+      tableWrap.innerHTML = buildTableFromRows(matrix);
+
+      document.getElementById('sheetName').textContent = `Rows: ${Math.max(0, matrix.length - 1)}`;
+      document.getElementById('fetchedAt').textContent = 'Page fetched: ' + new Date().toLocaleString();
+
+      // Try to surface a "last updated" from a column name if present
+      const headerLc = header.map(h => String(h || '').toLowerCase().trim());
+      const luIdx = headerLc.findIndex(h => ['last updated','updated','last update','last_modified','modified'].includes(h));
+      if (luIdx !== -1 && matrix.length > 1){
+        const luVal = matrix[1][luIdx];
+        if (luVal) document.getElementById('lastUpdated').textContent = 'Sheet last updated: ' + luVal;
+      }
+
+      // Set initial view
+      setView(DEFAULT_VIEW);
+    }
+
+    function setView(view){
+      const cardsWrap = document.getElementById('cardsWrap');
+      const tableWrap = document.getElementById('tableWrap');
+      const btnCards = document.getElementById('btnCards');
+      const btnTable = document.getElementById('btnTable');
+
+      if(view === 'table'){
+        cardsWrap.classList.add('hide');
+        tableWrap.classList.remove('hide');
+        btnTable.classList.add('active');
+        btnCards.classList.remove('active');
+      } else {
+        tableWrap.classList.add('hide');
+        cardsWrap.classList.remove('hide');
+        btnCards.classList.add('active');
+        btnTable.classList.remove('active');
+      }
+    }
+
+    // JSONP loader — injects a <script> tag that calls handleGviz(...)
+    function loadData(){
+      const cardsWrap = document.getElementById('cardsWrap');
+      const tableWrap = document.getElementById('tableWrap');
+      cardsWrap.textContent = 'Loading data…';
+      tableWrap.textContent = '';
+
+      const old = document.getElementById('gvizJSONP');
+      if (old) old.remove();
+
+      const s = document.createElement('script');
+      s.id = 'gvizJSONP';
+      s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&tqx=out:json;responseHandler:handleGviz`;
+      s.onerror = () => {
+        cardsWrap.innerHTML = '<p>Could not load data (network/permissions). Ensure the sheet is <em>Published to the web</em>.</p>';
+      };
+      document.head.appendChild(s);
+    }
+
+    // Toggle buttons
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('btnCards').addEventListener('click', () => setView('cards'));
+      document.getElementById('btnTable').addEventListener('click', () => setView('table'));
+    });
+
+    // Initial load
+    loadData();
+  </script>
+</body>
+</html>
