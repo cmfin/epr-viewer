@@ -28,13 +28,13 @@
       font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
       color:var(--text);
       background:var(--bg);
-      line-height:1.75;        /* more breathing room */
+      line-height:1.75;
       letter-spacing:0.15px;
     }
 
-    .wrap{ max-width:1400px; margin:24px auto 48px; padding:0 16px; }
+    .wrap{ max-width:1200px; margin:24px auto 48px; padding:0 16px; }
 
-    .brand{ display:flex; align-items:center; gap:16px; margin-bottom:12px; }
+    .brand{ display:flex; align-items:center; gap:16px; margin-bottom:14px; }
     .brand img{ height:64px; width:auto; border-radius:10px; display:block; }
     .headline{ font-size:22px; font-weight:800; color:var(--navy); line-height:1.2; }
     .sub{ color:var(--muted); margin-top:4px; }
@@ -43,155 +43,57 @@
       background:var(--card); border:1px solid var(--border); border-radius:16px;
       box-shadow:0 8px 24px rgba(16,24,40,.06); padding:16px;
     }
+
     .meta{
       display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between;
       padding:6px 2px 12px;
     }
+
+    .leftMeta{
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    }
+
     .badge{
       display:inline-block; padding:6px 10px; border-radius:999px; font-size:12px; font-weight:700;
       background:linear-gradient(90deg, rgba(43,76,112,.12), rgba(42,163,107,.12));
       color:var(--navy);
     }
+
+    .viewBar{
+      display:flex; gap:8px; align-items:center;
+    }
+    .pill{
+      border:1px solid var(--border); background:#fff; padding:8px 12px; border-radius:999px; cursor:pointer; font-weight:700;
+    }
+    .pill.active{ background: rgba(42,163,107,.12); color: var(--navy); border-color: rgba(42,163,107,.35); }
+
     button.refresh{
       border:1px solid var(--border); background:#fff; padding:8px 12px;
       border-radius:10px; cursor:pointer; font-weight:700;
     }
     button.refresh:hover{ background:#f1f5f9; }
 
+    /* TABLE styles (kept for toggle) */
     .tableScroll{ overflow-x:auto; -webkit-overflow-scrolling: touch; }
-
     table{ width:100%; border-collapse:collapse; margin-top:8px; table-layout:auto; }
     thead th{
       background:linear-gradient(0deg, rgba(43,76,112,0.10), rgba(43,76,112,0.10));
       color:#0b2542; font-weight:800; text-align:left; padding:12px 14px; border-bottom:2px solid var(--border);
       font-size:14px; position:sticky; top:0;
     }
-
     thead th, tbody td{
       font-size: var(--font-size);
       padding: var(--cell-pad-y) var(--cell-pad-x);
-      white-space: pre-wrap;     /* respect \n from the sheet */
-      word-break: normal;
-      overflow-wrap: anywhere;   /* wrap very long words/URLs */
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
       hyphens: auto;
       vertical-align: top;
     }
-
     tbody tr:nth-child(even){ background:var(--rowAlt); }
     tbody tr:hover{ background: rgba(43,76,112,0.05); }
-
-    /* extra breathing room between columns */
     tbody td + td{ padding-left: calc(var(--cell-pad-x) + 12px); }
 
-    /* soft green accent on first column */
-    tbody td:first-child{
-      border-left: 4px solid rgba(42,163,107,.35);
-      padding-left: calc(var(--cell-pad-x) - 4px);
-    }
-
-    .footerNote{ color:var(--muted); font-size:12px; margin-top:10px; }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="brand">
-      <!-- Use the logo you uploaded to the repo -->
-      <img src="logo.png" alt="HCPA logo"
-           onerror="this.onerror=null;this.src='https://drive.google.com/uc?export=view&id=13orYcC_txArGIeSmYt6508rdyZ67YEgx';">
-      <div>
-        <div class="headline">Household & Commercial Products Association</div>
-        <div class="sub">Innovative Products for Home. Work. Life.</div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="meta">
-        <div><span id="sheetName" class="badge">Loading…</span></div>
-        <div class="sub" id="lastUpdated">Sheet last updated: —</div>
-        <div><button class="refresh" onclick="loadData()">↻ Refresh</button></div>
-      </div>
-
-      <div class="tableScroll"><div id="tableWrap">Loading data…</div></div>
-      <div class="footerNote" id="fetchedAt">Page fetched: —</div>
-    </div>
-  </div>
-
-  <script>
-    // === CONFIG ===
-    const SHEET_ID = '1Zkp6pU4w10QEe1SorNFp3iJqt4n15h7FCNH_oBOBoaI';
-    const GID = '0'; // tab gid
-
-    function escapeHtml(s){
-      return String(s ?? '')
-        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-        .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
-    }
-
-    function parseGviz(text){
-      // gviz returns: /*O_o*/\ngoogle.visualization.Query.setResponse({...});
-      const m = text.match(/setResponse\(([\s\S]*?)\);/);
-      if(!m) throw new Error('Unexpected GViz format');
-      return JSON.parse(m[1]);
-    }
-
-    function buildTableFromRows(matrix){
-      if(!matrix.length){ return '<p>No data found.</p>'; }
-      const header = matrix[0];
-      const rows = matrix.slice(1);
-
-      let html = '<table><thead><tr>';
-      header.forEach(h => html += `<th>${escapeHtml(h)}</th>`);
-      html += '</tr></thead><tbody>';
-      rows.forEach(r => {
-        html += '<tr>';
-        for(let i=0;i<header.length;i++){
-          html += `<td>${escapeHtml(r[i] ?? '')}</td>`;
-        }
-        html += '</tr>';
-      });
-      html += '</tbody></table>';
-      return html;
-    }
-
-    async function loadData(){
-      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${GID}`;
-      const tableWrap = document.getElementById('tableWrap');
-      tableWrap.textContent = 'Loading data…';
-
-      try{
-        const res = await fetch(url, { cache: 'no-store' });
-        const lastMod = res.headers.get('last-modified'); // may be null
-        const text = await res.text();
-        const json = parseGviz(text);
-        if(json.status !== 'ok') throw new Error('GViz status not ok');
-
-        // Convert GViz table -> simple 2D array of display values
-        const colsLen = json.table.cols.length;
-        const matrix = json.table.rows.map(row => {
-          const arr = new Array(colsLen).fill('');
-          (row.c || []).forEach((cell, idx) => { arr[idx] = cell ? (cell.f ?? cell.v ?? '') : ''; });
-          return arr;
-        });
-
-        if (matrix.length === 0) {
-          tableWrap.innerHTML = '<p>No data found.</p>';
-          return;
-        }
-
-        document.getElementById('sheetName').textContent = 'Data';
-        document.getElementById('fetchedAt').textContent = 'Page fetched: ' + new Date().toLocaleString();
-        document.getElementById('lastUpdated').textContent = lastMod
-          ? ('Sheet last updated: ' + new Date(lastMod).toLocaleString())
-          : 'Sheet last updated: (time not provided by server)';
-
-        tableWrap.innerHTML = buildTableFromRows(matrix);
-      }catch(err){
-        console.error(err);
-        tableWrap.innerHTML = '<p>Could not load data. Ensure the sheet is <em>File → Share → Publish to the web</em>.</p>';
-      }
-    }
-
-    loadData();
-  </script>
-</body>
-</html>
+    /* CARD-ROW layout (default) */
+    #cardsWrap{ display: grid; gap: 14px; }
+    .rowCard{
+      border:1px solid var(--border); border-left:6px solid rgba(42,163,1
