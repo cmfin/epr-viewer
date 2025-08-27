@@ -56,109 +56,55 @@
     tbody tr:nth-child(even){ background:var(--rowAlt); }
     thead th, tbody td{ white-space:normal; word-wrap:break-word; }
     .footerNote{ color:var(--muted); font-size:12px; margin-top:10px; }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="brand">
-      <!-- Use the logo you uploaded to the repo -->
-      <img src="logo.png" alt="HCPA logo"
-           onerror="this.onerror=null;this.src='https://drive.google.com/uc?export=view&id=13orYcC_txArGIeSmYt6508rdyZ67YEgx';">
-      <div>
-        <div class="headline">Household & Commercial Products Association</div>
-        <div class="sub">Innovative Products for Home. Work. Life.</div>
-      </div>
-    </div>
+ /* === Comfort spacing overrides === */
+/* === Comfort spacing overrides (drop-in replacement) === */
+:root{
+  --font-size: 16px;         /* bigger text */
+  --cell-pad-y: 16px;        /* taller rows */
+  --cell-pad-x: 22px;        /* wider cells */
+}
 
-    <div class="card">
-      <div class="meta">
-        <div><span id="sheetName" class="badge">Loading…</span></div>
-        <div class="sub" id="lastUpdated">Sheet last updated: —</div>
-        <div><button class="refresh" onclick="loadData()">↻ Refresh</button></div>
-      </div>
+body{
+  line-height: 1.75;         /* more breathing room */
+  letter-spacing: 0.15px;
+}
 
-      <div class="tableScroll"><div id="tableWrap">Loading data…</div></div>
-      <div class="footerNote" id="fetchedAt">Page fetched: —</div>
-    </div>
-  </div>
+.wrap{
+  max-width: 1400px;         /* wider page so columns aren’t cramped */
+}
 
-  <script>
-    // === CONFIG ===
-    const SHEET_ID = '1Zkp6pU4w10QEe1SorNFp3iJqt4n15h7FCNH_oBOBoaI';
-    const GID = '0'; // tab gid
+/* let columns expand naturally */
+table{ table-layout: auto; }
 
-    function escapeHtml(s){
-      return String(s ?? '')
-        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-        .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
-    }
+/* KEY: preserve line breaks from the sheet & wrap long words */
+thead th, tbody td{
+  font-size: var(--font-size);
+  padding: var(--cell-pad-y) var(--cell-pad-x);
+  white-space: pre-wrap;     /* <-- was 'normal'; this respects \n from the sheet */
+  word-break: normal;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  vertical-align: top;
+}
 
-    function parseGviz(text){
-      // gviz returns: /*O_o*/\ngoogle.visualization.Query.setResponse({...});
-      const m = text.match(/setResponse\(([\s\S]*?)\);/);
-      if(!m) throw new Error('Unexpected GViz format');
-      return JSON.parse(m[1]);
-    }
+/* a little extra space between columns */
+tbody td + td{
+  padding-left: calc(var(--cell-pad-x) + 12px);
+}
 
-    function buildTableFromRows(matrix){
-      if(!matrix.length){ return '<p>No data found.</p>'; }
-      const header = matrix[0];
-      const rows = matrix.slice(1);
+/* stronger header + nicer hover */
+thead th{
+  border-bottom: 2px solid var(--border);
+  font-weight: 800;
+}
 
-      let html = '<table><thead><tr>';
-      header.forEach(h => html += `<th>${escapeHtml(h)}</th>`);
-      html += '</tr></thead><tbody>';
-      rows.forEach(r => {
-        html += '<tr>';
-        for(let i=0;i<header.length;i++){
-          html += `<td>${escapeHtml(r[i] ?? '')}</td>`;
-        }
-        html += '</tr>';
-      });
-      html += '</tbody></table>';
-      return html;
-    }
+/* subtle row hover */
+tbody tr:hover{
+  background: rgba(43,76,112,0.05);
+}
 
-    async function loadData(){
-      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${GID}`;
-      const tableWrap = document.getElementById('tableWrap');
-      tableWrap.textContent = 'Loading data…';
-
-      try{
-        const res = await fetch(url, { cache: 'no-store' });
-        const lastMod = res.headers.get('last-modified'); // may be null
-        const text = await res.text();
-        const json = parseGviz(text);
-        if(json.status !== 'ok') throw new Error('GViz status not ok');
-
-        // Convert GViz table -> simple 2D array of display values
-        const colsLen = json.table.cols.length;
-        const matrix = json.table.rows.map(row => {
-          const arr = new Array(colsLen).fill('');
-          (row.c || []).forEach((cell, idx) => { arr[idx] = cell ? (cell.f ?? cell.v ?? '') : ''; });
-          return arr;
-        });
-
-        // Use FIRST ROW as header (this removes the A/B/C labels issue)
-        if (matrix.length === 0) {
-          tableWrap.innerHTML = '<p>No data found.</p>';
-          return;
-        }
-
-        document.getElementById('sheetName').textContent = 'Data';
-        document.getElementById('fetchedAt').textContent = 'Page fetched: ' + new Date().toLocaleString();
-        document.getElementById('lastUpdated').textContent = lastMod
-          ? ('Sheet last updated: ' + new Date(lastMod).toLocaleString())
-          : 'Sheet last updated: (time not provided by server)';
-
-        tableWrap.innerHTML = buildTableFromRows(matrix);
-      }catch(err){
-        console.error(err);
-        tableWrap.innerHTML = '<p>Could not load data. Ensure the sheet is <em>File → Share → Publish to the web</em>.</p>';
-      }
-    }
-
-    loadData();
-  </script>
-</body>
-</html>
+/* add a soft green accent bar on each row for a bit more color */
+tbody td:first-child{
+  border-left: 4px solid rgba(42,163,107,.35);
+  padding-left: calc(var(--cell-pad-x) - 4px);
+}
