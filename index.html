@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HCPA Sheet Viewer</title>
+  <style>
+    :root{
+      /* Softer versions of your logo colors */
+      --navy: #2b4c70;     /* soft blue */
+      --green: #2aa36b;    /* soft green */
+      --text: #102A43;     /* deep slate */
+      --muted: #64748b;    /* slate-500 */
+      --bg: #f5f8fb;       /* light blue-grey */
+      --card: #ffffff;
+      --rowAlt: #f8fafc;
+      --border: #e5e7eb;
+    }
+    *{ box-sizing: border-box; }
+    body{
+      margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color:var(--text); background:var(--bg);
+    }
+    .wrap{ max-width:1100px; margin:24px auto 48px; padding:0 16px; }
+    .brand{ display:flex; align-items:center; gap:16px; margin-bottom:10px; }
+    .brand img{ height:64px; width:auto; border-radius:10px; display:block; }
+    .headline{ font-size:20px; font-weight:700; color:var(--navy); line-height:1.2; }
+    .sub{ color:var(--muted); margin-top:4px; }
+    .card{
+      background:var(--card); border:1px solid var(--border); border-radius:14px;
+      box-shadow:0 8px 24px rgba(16,24,40,.06); padding:16px;
+    }
+    .meta{
+      display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between;
+      padding:8px 4px 12px;
+    }
+    .badge{
+      display:inline-block; padding:6px 10px; border-radius:999px;
+      background:rgba(42,163,107,.12); color:var(--green); font-weight:600; font-size:12px;
+    }
+    button.refresh{
+      border:1px solid var(--border); background:#fff; padding:8px 12px;
+      border-radius:10px; cursor:pointer; font-weight:600;
+    }
+    button.refresh:hover{ background:#f1f5f9; }
+
+    table{ width:100%; border-collapse:collapse; margin-top:8px; border:1px solid var(--border); }
+    thead th{
+      background:linear-gradient(0deg, rgba(43,76,112,0.06), rgba(43,76,112,0.06));
+      color:#0b2542; font-weight:700; text-align:left; padding:12px; border-bottom:1px solid var(--border);
+      font-size:14px;
+    }
+    tbody td{ padding:12px; border-bottom:1px solid var(--border); font-size:14px; }
+    tbody tr:nth-child(even){ background:var(--rowAlt); }
+    .footerNote{ color:var(--muted); font-size:12px; margin-top:10px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">
+      <img id="logo" alt="HCPA logo">
+      <div>
+        <div class="headline">Household & Commercial Products Association</div>
+        <div class="sub">Innovative Products for Home. Work. Life.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="meta">
+        <div><span id="sheetName" class="badge">Loading…</span></div>
+        <div class="sub" id="lastUpdated">Sheet last updated: —</div>
+        <div><button class="refresh" onclick="loadData()">↻ Refresh</button></div>
+      </div>
+
+      <div id="tableWrap">Loading data…</div>
+      <div class="footerNote" id="fetchedAt">Page fetched: —</div>
+    </div>
+  </div>
+
+  <script>
+    // === CONFIG: put your IDs here ===
+    const SHEET_ID = '1Zkp6pU4w10QEe1SorNFp3iJqt4n15h7FCNH_oBOBoaI';
+    const GID = '0'; // first tab
+    const LOGO_URL = 'https://drive.google.com/uc?export=view&id=13orYcC_txArGIeSmYt6508rdyZ67YEgx';
+
+    document.getElementById('logo').src = LOGO_URL;
+
+    function escapeHtml(s){
+      return String(s ?? '')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+    }
+
+    function buildTableFromGviz(table){
+      const headers = table.cols.map((c, i) => c.label || c.id || ('Col' + (i+1)));
+      const rows = table.rows || [];
+
+      let html = '<table><thead><tr>';
+      headers.forEach(h => html += `<th>${escapeHtml(h)}</th>`);
+      html += '</tr></thead><tbody>';
+
+      rows.forEach(r => {
+        const cells = (r.c || []).map(c => c ? (c.f || c.v) : '');
+        html += '<tr>';
+        headers.forEach((_, i) => html += `<td>${escapeHtml(cells[i] ?? '')}</td>`);
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+      return html;
+    }
+
+    function parseGviz(text){
+      // gviz returns: /*O_o*/\ngoogle.visualization.Query.setResponse({...});
+      const m = text.match(/setResponse\(([\s\S]*?)\);/);
+      if(!m) throw new Error('Unexpected GViz format');
+      return JSON.parse(m[1]);
+    }
+
+    async function loadData(){
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${GID}`;
+      const tableWrap = document.getElementById('tableWrap');
+      tableWrap.textContent = 'Loading data…';
+
+      try{
+        const res = await fetch(url, { cache: 'no-store' });
+        const lastMod = res.headers.get('last-modified'); // may be null if header not exposed
+        const text = await res.text();
+        const json = parseGviz(text);
+
+        if(json.status !== 'ok') throw new Error('GViz status not ok');
+
+        document.getElementById('sheetName').textContent = json.table?.rows?.length
+          ? (json.table?.cols?.length ? (json.table?.cols[0]?.label ? 'Sheet' : 'Data') : 'Sheet')
+          : 'Sheet';
+
+        if (lastMod) {
+          document.getElementById('lastUpdated').textContent = 'Sheet last updated: ' + new Date(lastMod).toLocaleString();
+        } else {
+          document.getElementById('lastUpdated').textContent = 'Sheet last updated: (time not provided by server)';
+        }
+
+        tableWrap.innerHTML = buildTableFromGviz(json.table);
+        document.getElementById('fetchedAt').textContent = 'Page fetched: ' + new Date().toLocaleString();
+      }catch(err){
+        console.error(err);
+        tableWrap.innerHTML = '<p>Could not load data. Make sure the sheet is <em>Published to the web</em>.</p>';
+      }
+    }
+
+    // Initial load
+    loadData();
+  </script>
+</body>
+</html>
